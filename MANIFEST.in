@@ -1,0 +1,3 @@
+include MANIFEST.in
+
+recursive-include django_extended_history/templates *
