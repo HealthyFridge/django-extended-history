@@ -13,10 +13,10 @@ Requirements
 Features
 =============
 
--  Drop-in replacement for default Django history. No changes in any model, hence no migrations.
--  Records all changes in JSON format as an extension to what Django already stores.
--  Adds a view 'Log entries' under 'Administration', showing only those entries to which a user has view-permissions.
--  Safe to remove if needed. Django will ignore the extra recorded information.
+-  Drop-in extension for Django history. No changes in any model, hence no migrations.
+-  Records all changes in JSON format, extending what Django stores by default.
+-  Adds a view 'Log entries' under 'Administration', showing all content types for which a user has permissions.
+-  Safe to remove. Django will ignore all extra recorded information and revert to it's default history. So give it a spin!
 
 =============
 
@@ -60,3 +60,8 @@ Apply the **DjangoExtendedHistory** mixin to all applicable admin-views:
     class MyModelAdmin(DjangoExtendedHistory, admin.ModelAdmin):
         ...
 
+------------
+Misc
+------------
+
+Django extended history is released under the BSD-3 license, like Django. If you like it, please consider contributing.
