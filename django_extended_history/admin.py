@@ -147,7 +147,7 @@ class LogEntryAdmin(admin.ModelAdmin):
             # List only those logentries to which to user has permission
             queryset = queryset.filter(Q(content_type__in=Permission.objects.filter(group__user=request.user).values('content_type')) |
                                        Q(content_type__in=Permission.objects.filter(user=request.user).values('content_type')))
-        return queryset.prefetch_related('content_type')
+        return queryset.prefetch_related('content_type').defer('change_message')
 
     @admin.display(description=_('change message'))
     def get_change_message(self, request):
