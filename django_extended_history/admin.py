@@ -127,7 +127,7 @@ class DjangoExtendedHistory:
 
                     deleted_form_set.append(deleted_form_list)
 
-                    change_message.append({"deleted related": deleted_form_set})
+                change_message.append({"deleted related": deleted_form_set})
 
         return change_message
 
