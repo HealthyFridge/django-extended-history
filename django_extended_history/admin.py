@@ -106,28 +106,29 @@ class DjangoExtendedHistory:
                     change_message.append({"changed related": changed_form_set})
 
                 deleted_form_set = []
-                for deleted_object in formset.deleted_objects:
-                    deleted_form_list = []
-                    for form in formset.initial_forms:
+                if formset.deleted_objects:
+                    for deleted_object in formset.deleted_objects:
+                        deleted_form_list = []
+                        for form in formset.initial_forms:
 
-                        deleted_fields_list = []
-                        if form.instance != deleted_object:
-                            continue
+                            deleted_fields_list = []
+                            if form.instance != deleted_object:
+                                continue
 
-                        for field in form.initial:
-                            if form.initial[field] is not None and hasattr(form.fields[field], 'queryset'):
-                                old_value = str(form.fields[field].queryset.filter(pk=form.initial[field]).first())
-                            else:
-                                old_value = str(form.initial[field])
+                            for field in form.initial:
+                                if form.initial[field] is not None and hasattr(form.fields[field], 'queryset'):
+                                    old_value = str(form.fields[field].queryset.filter(pk=form.initial[field]).first())
+                                else:
+                                    old_value = str(form.initial[field])
 
-                            deleted_field_content = {"old": old_value}
-                            deleted_fields_list.append({field: deleted_field_content})
+                                deleted_field_content = {"old": old_value}
+                                deleted_fields_list.append({field: deleted_field_content})
 
-                        deleted_form_list.append({str(deleted_object._meta.model_name): str(deleted_object), "fields": deleted_fields_list})
+                            deleted_form_list.append({str(deleted_object._meta.model_name): str(deleted_object), "fields": deleted_fields_list})
 
-                    deleted_form_set.append(deleted_form_list)
+                        deleted_form_set.append(deleted_form_list)
 
-                change_message.append({"deleted related": deleted_form_set})
+                    change_message.append({"deleted related": deleted_form_set})
 
         return change_message
 
