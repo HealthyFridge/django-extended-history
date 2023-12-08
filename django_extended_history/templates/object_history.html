@@ -17,8 +17,17 @@
         <tbody>
         {% for action in action_list reversed %}
         <tr>
-            <th scope="row"><a href="{% url 'admin:admin_logentry_change' action.pk %}">{{ action.action_time|date:"DATETIME_FORMAT" }}</a></th>
-            <td>{{ action.user.get_username }}{% if action.user.get_full_name %} ({{ action.user.get_full_name }}){% endif %}</td>
+            <th scope="row">{% if perms.admin_change_logentry %}
+                  <a href="{% url 'admin:admin_logentry_change' action.pk %}">{{ action.action_time|date:"DATETIME_FORMAT" }}</a>
+                {% else %}
+                  {{ action.action_time|date:"DATETIME_FORMAT" }}
+                {% endif %}
+              </th>
+            <td>{% if perms.auth.change_user %}
+                  <a href="{% url 'admin:auth_user_change' action.user.pk %}">{{ action.user.get_username }}{% if action.user.get_full_name %} ({{ action.user.get_full_name }}){% endif %}</a>
+                {% else %}
+                  {{ action.user.get_username }}{% if action.user.get_full_name %} ({{ action.user.get_full_name }}){% endif %}
+                {% endif %}</td>
             <td>{{ action.get_change_message }}</td>
         </tr>
         {% endfor %}
