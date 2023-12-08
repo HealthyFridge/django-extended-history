@@ -17,7 +17,7 @@
         <tbody>
         {% for action in action_list reversed %}
         <tr>
-            <th scope="row">{% if perms.admin_change_logentry %}
+            <th scope="row">{% if perms.admin.view_logentry %}
                   <a href="{% url 'admin:admin_logentry_change' action.pk %}">{{ action.action_time|date:"DATETIME_FORMAT" }}</a>
                 {% else %}
                   {{ action.action_time|date:"DATETIME_FORMAT" }}
