@@ -1,3 +1,4 @@
+import base64
 import json
 
 from django.contrib import admin
@@ -115,14 +116,15 @@ class DjangoExtendedHistory:
                             if form.instance != deleted_object:
                                 continue
 
-                            for field in form.initial:
-                                if form.initial[field] is not None and hasattr(form.fields[field], 'queryset'):
-                                    old_value = str(form.fields[field].queryset.filter(pk=form.initial[field]).first())
-                                else:
-                                    old_value = str(form.initial[field])
+                            for field in form.instance._meta.fields:
+                                if not isinstance(field, (models.AutoField, models.BigAutoField, models.SmallAutoField)):
+                                    if isinstance(field, models.BinaryField):
+                                        old_value = base64.b64encode(getattr(deleted_object, field.name)).decode('utf-8') 
+                                    else:
+                                        old_value = str(getattr(deleted_object, field.name))
 
-                                deleted_field_content = {"old": old_value}
-                                deleted_fields_list.append({field: deleted_field_content})
+                                    deleted_field_content = {"old": old_value}
+                                    deleted_fields_list.append({field: deleted_field_content})
 
                             deleted_form_list.append({str(deleted_object._meta.model_name): str(deleted_object), "fields": deleted_fields_list})
 
