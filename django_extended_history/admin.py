@@ -124,7 +124,7 @@ class DjangoExtendedHistory:
                                         old_value = str(getattr(deleted_object, field.name))
 
                                     deleted_field_content = {"old": old_value}
-                                    deleted_fields_list.append({field: deleted_field_content})
+                                    deleted_fields_list.append({field.name: deleted_field_content})
 
                             deleted_form_list.append({str(deleted_object._meta.model_name): str(deleted_object), "fields": deleted_fields_list})
 
