@@ -4,10 +4,16 @@
    :target: https://pypi.python.org/pypi/django-extended-history
 
 
-|PyPI - Downloads|
+|PyPI download total|
 
-.. |PyPI - Downloads| image:: https://img.shields.io/pypi/dm/django-extended-history
-   :target: 
+.. |PyPI download total| image:: https://img.shields.io/pypi/dt/ansicolortags.svg
+   :target: https://pypi.python.org/pypi/ansicolortags/
+
+
+|PyPI download month|
+
+.. |PyPI download month| image:: https://img.shields.io/pypi/dm/django-extended-history.svg
+   :target: https://pypi.python.org/pypi/django-extended-history/
 
 
 django-extended-history
