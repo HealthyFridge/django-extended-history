@@ -4,6 +4,12 @@
    :target: https://pypi.python.org/pypi/django-extended-history
 
 
+|PyPI - Downloads|
+
+.. |PyPI - Downloads| image:: https://img.shields.io/pypi/dm/django-extended-history
+   :target: 
+
+
 django-extended-history
 ========================
 
