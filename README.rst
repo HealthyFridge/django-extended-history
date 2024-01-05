@@ -2,7 +2,6 @@
 
 .. |PyPI| image:: https://img.shields.io/pypi/pyversions/Django.svg?style=plastic
    :target: https://pypi.python.org/pypi/django-extended-history
-
 |PyPI download month|
 
 .. |PyPI download month| image:: https://img.shields.io/pypi/dm/django-extended-history.svg
