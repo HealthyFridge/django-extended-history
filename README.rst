@@ -1,4 +1,7 @@
-|PyPI| image:: https://img.shields.io/pypi/pyversions/Django.svg?style=plastic :target: https://pypi.python.org/pypi/django-extended-history
+|PyPI|
+
+.. |PyPI| image:: https://img.shields.io/pypi/pyversions/Django.svg?style=plastic
+   :target: https://pypi.python.org/pypi/django-extended-history
 
 
 django-extended-history
