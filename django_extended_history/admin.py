@@ -16,6 +16,28 @@ from json2html import *  # type: ignore (as per install-instructions)
 
 class DjangoExtendedHistory:
     object_history_template = 'object_history.html'
+    
+    def log_deletion(self, request, obj, object_repr):
+        """
+        Log that an object will be deleted. Note that this method must be
+        called before the deletion.
+
+        The default implementation creates an admin LogEntry object.
+        """
+        from django.contrib.admin.models import DELETION, LogEntry
+        from django.contrib.admin.options import get_content_type_for_model
+        from django.core import serializers
+        
+        data = serializers.serialize("json", [ obj, ])
+
+        return LogEntry.objects.log_action(
+            user_id=request.user.pk,
+            content_type_id=get_content_type_for_model(obj).pk,
+            object_id=obj.pk,
+            object_repr=object_repr,
+            action_flag=DELETION,
+            change_message=data,
+        )
 
     def construct_change_message(self, request, form, formsets, add=False):
         # First create the default LogEntry message
