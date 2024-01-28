@@ -9,6 +9,7 @@ from django.db import models
 from django.db.models import Q
 from django.urls import NoReverseMatch, reverse
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from json2html import *  # type: ignore (as per install-instructions)
 
@@ -138,10 +139,10 @@ class DjangoExtendedHistory:
 class LogEntryAdmin(admin.ModelAdmin):
     date_hierarchy = 'action_time'
 
-    list_display = ('action_time', 'user', 'action_flag', 'content_type', 'get_url_to_obj')
-    exclude = ('change_message', 'object_id', 'object_repr',)
-    list_filter = ('user', 'action_time', 'action_flag')
-    readonly_fields = ('action_time', 'user', 'action_flag', 'content_type', 'get_url_to_obj', 'get_change_message')
+    list_display = ['action_time', 'user', 'action_flag', 'content_type', 'get_url_to_obj']
+    exclude = ['change_message', 'object_id', 'object_repr',]
+    list_filter = ['user', 'action_time', 'action_flag']
+    readonly_fields = ['action_time', 'user', 'action_flag', 'content_type', 'get_url_to_obj', 'get_change_message']
     search_fields = ['object_repr', 'change_message']
 
     def get_queryset(self, request):
@@ -157,20 +158,17 @@ class LogEntryAdmin(admin.ModelAdmin):
         cm: str = request.change_message
         if cm and cm[0] == "[":
             try:
-                cm = json2html.convert(json=cm)  # type: ignore
+                cm = mark_safe(json2html.convert(json=cm))  # type: ignore
             except json.JSONDecodeError:
                 pass
-        try:
-            return format_html(cm)
-        except:
-            return cm
+        return cm
 
     @admin.display(description=_('object repr'))
     def get_url_to_obj(self, request):
         if request.content_type and request.object_id:
             try:
                 change_url = reverse(f'admin:{request.content_type.app_label}_{request.content_type.model}_change', args=(request.object_id,))
-                return format_html('<a href="%s">%s</a>' % (change_url, request.object_repr))
+                return format_html('<a href="{}">{}</a>', change_url, request.object_repr)
             except NoReverseMatch:
                 pass
         return request.object_repr
