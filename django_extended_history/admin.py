@@ -1,5 +1,6 @@
 import base64
 import json
+from typing import Any
 
 from django.contrib import admin
 from django.contrib.admin.models import LogEntry
@@ -11,12 +12,17 @@ from django.urls import NoReverseMatch, reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from json2html import *  # type: ignore (as per install-instructions)
+from json2html import json2html
+
+
+def safe_pk(pk: Any):
+    """Return a representation of the primary key that is safe to be serialized to JSON later."""
+    return pk if isinstance(pk, (int, str, bytes, bytearray)) else str(pk)
 
 
 class DjangoExtendedHistory:
     object_history_template = 'object_history.html'
-    
+
     def log_deletion(self, request, obj, object_repr):
         """
         Log that an object will be deleted. Note that this method must be
@@ -27,7 +33,7 @@ class DjangoExtendedHistory:
         from django.contrib.admin.models import DELETION, LogEntry
         from django.contrib.admin.options import get_content_type_for_model
         from django.core import serializers
-        
+
         data = serializers.serialize("json", [ obj, ])
 
         return LogEntry.objects.log_action(
@@ -57,7 +63,7 @@ class DjangoExtendedHistory:
                             # is manytomany
                             old_pks = [item.pk for item in form.initial[field]]
                         else:
-                            old_values["pk"] = form.initial[field]
+                            old_values["pk"] = safe_pk(form.initial[field])
                             old_values["object"] = str(form.fields[field].queryset.filter(pk=old_values["pk"]).first())
                     else:
                         old_values["value"] = str(form.initial[field])
@@ -69,17 +75,17 @@ class DjangoExtendedHistory:
                         # is manytomany
                         new_pks = [item.pk for item in form.cleaned_data[field].all()]
                         removed_pks = [item for item in old_pks if item not in new_pks]
-                        removed = [({"pk": item.pk, "object": str(item)}) for item in list(form.fields[field].queryset.filter(pk__in=removed_pks).all())]
+                        removed = [({"pk": safe_pk(item.pk), "object": str(item)}) for item in list(form.fields[field].queryset.filter(pk__in=removed_pks).all())]
                         if removed:
                             field_values["removed"] = removed
 
                         added_pks = [item for item in new_pks if item not in old_pks]
-                        added = [({"pk": item.pk, "object": str(item)}) for item in form.cleaned_data[field] if item.pk in added_pks]
+                        added = [({"pk": safe_pk(item.pk), "object": str(item)}) for item in form.cleaned_data[field] if item.pk in added_pks]
                         if added:
                             field_values["added"] = added
                     else:
                         if hasattr(form.cleaned_data[field], 'pk'):
-                            new_values["pk"] = form.cleaned_data[field].pk
+                            new_values["pk"] = safe_pk(form.cleaned_data[field].pk)
                             new_values["object"] = str(form.cleaned_data[field])
                         else:
                             new_values["value"] = str(form.cleaned_data[field])
@@ -142,7 +148,7 @@ class DjangoExtendedHistory:
                             for field in form.instance._meta.fields:
                                 if not isinstance(field, (models.AutoField, models.BigAutoField, models.SmallAutoField)):
                                     if isinstance(field, models.BinaryField):
-                                        old_value = base64.b64encode(getattr(deleted_object, field.name)).decode('utf-8') 
+                                        old_value = base64.b64encode(getattr(deleted_object, field.name)).decode('utf-8')
                                     else:
                                         old_value = str(getattr(deleted_object, field.name))
 
@@ -169,7 +175,7 @@ class LogEntryAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         queryset = super(LogEntryAdmin, self).get_queryset(request)
-        if request.user.is_superuser == False:  # type: ignore
+        if request.user.is_superuser is False:
             # List only those logentries to which to user has permission
             queryset = queryset.filter(Q(content_type__in=Permission.objects.filter(group__user=request.user).values('content_type')) |
                                        Q(content_type__in=Permission.objects.filter(user=request.user).values('content_type')))
