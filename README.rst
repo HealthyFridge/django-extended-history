@@ -15,7 +15,7 @@ django-extended-history
 Requirements
 =============
 
-- Django >=4.1
+- Django >=4.2
 
 =============
 Features

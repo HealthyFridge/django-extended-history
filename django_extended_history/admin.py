@@ -23,6 +23,7 @@ def safe_pk(pk: Any):
 class DjangoExtendedHistory:
     object_history_template = 'object_history.html'
 
+    # Deprecated in Django 5.1. Keep until end-of-support for Django 4.2 LTS (April 2026)
     def log_deletion(self, request, obj, object_repr):
         """
         Log that an object will be deleted. Note that this method must be
@@ -44,6 +45,27 @@ class DjangoExtendedHistory:
             action_flag=DELETION,
             change_message=data,
         )
+        
+    def log_deletions(self, request, queryset):
+        """
+        Log that an object will be deleted. Note that this method must be
+        called before the deletion.
+
+        The default implementation creates an admin LogEntry object.
+        """
+        from django.contrib.admin.models import DELETION, LogEntry
+        from django.core import serializers
+
+        for obj in queryset:
+            data = serializers.serialize("json", [ obj, ])
+
+            return LogEntry.objects.log_actions(
+                user_id=request.user.pk,
+                queryset=[obj],
+                action_flag=DELETION,
+                change_message=data,
+                single_object=True,
+            )
 
     def construct_change_message(self, request, form, formsets, add=False):
         # First create the default LogEntry message
@@ -175,7 +197,7 @@ class LogEntryAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         queryset = super(LogEntryAdmin, self).get_queryset(request)
-        if request.user.is_superuser is False:
+        if not request.user.is_superuser:
             # List only those logentries to which to user has permission
             queryset = queryset.filter(Q(content_type__in=Permission.objects.filter(group__user=request.user).values('content_type')) |
                                        Q(content_type__in=Permission.objects.filter(user=request.user).values('content_type')))
