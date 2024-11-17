@@ -56,16 +56,16 @@ class DjangoExtendedHistory:
         from django.contrib.admin.models import DELETION, LogEntry
         from django.core import serializers
 
-        for obj in queryset:
-            data = serializers.serialize("json", [ obj, ])
-
-            return LogEntry.objects.log_actions(
+        return [
+            LogEntry.objects.log_actions(
                 user_id=request.user.pk,
                 queryset=[obj],
                 action_flag=DELETION,
-                change_message=data,
+                change_message=serializers.serialize("json", [ obj, ]),
                 single_object=True,
-            )
+            ) 
+            for obj in queryset
+        ]
 
     def construct_change_message(self, request, form, formsets, add=False):
         # First create the default LogEntry message
