@@ -97,7 +97,7 @@ class DjangoExtendedHistory:
                         # is manytomany
                         new_pks = [item.pk for item in form.cleaned_data[field].all()]
                         removed_pks = [item for item in old_pks if item not in new_pks]
-                        removed = [({"pk": safe_pk(item.pk), "object": str(item)}) for item in list(form.fields[field].queryset.filter(pk__in=removed_pks).all())]
+                        removed = [({"pk": safe_pk(item.pk), "object": str(item)}) for item in list(form.fields[field].queryset.query.model.objects.filter(pk__in=removed_pks))]
                         if removed:
                             field_values["removed"] = removed
 
