@@ -35,7 +35,7 @@ class DjangoExtendedHistory:
         from django.contrib.admin.options import get_content_type_for_model
         from django.core import serializers
 
-        data = serializers.serialize("json", [ obj, ])
+        data = serializers.serialize("json", [ obj, ], use_natural_foreign_keys=True)
 
         return LogEntry.objects.log_action(
             user_id=request.user.pk,
@@ -61,7 +61,7 @@ class DjangoExtendedHistory:
                 user_id=request.user.pk,
                 queryset=[obj],
                 action_flag=DELETION,
-                change_message=serializers.serialize("json", [ obj, ]),
+                change_message=serializers.serialize("json", [ obj, ], use_natural_foreign_keys=True),
                 single_object=True,
             ) 
             for obj in queryset
@@ -97,7 +97,7 @@ class DjangoExtendedHistory:
                         # is manytomany
                         new_pks = [item.pk for item in form.cleaned_data[field].all()]
                         removed_pks = [item for item in old_pks if item not in new_pks]
-                        removed = [({"pk": safe_pk(item.pk), "object": str(item)}) for item in list(form.fields[field].queryset.query.model.objects.filter(pk__in=removed_pks))]
+                        removed = [({"pk": safe_pk(item.pk), "object": str(item)}) for item in form.fields[field].queryset.query.model.objects.filter(pk__in=removed_pks)]
                         if removed:
                             field_values["removed"] = removed
 
@@ -191,7 +191,7 @@ class LogEntryAdmin(admin.ModelAdmin):
 
     list_display = ['action_time', 'user', 'action_flag', 'content_type', 'get_url_to_obj']
     exclude = ['change_message', 'object_id', 'object_repr',]
-    list_filter = ['user', 'action_time', 'action_flag']
+    list_filter = ['action_time', 'action_flag', ('user', admin.RelatedOnlyFieldListFilter)]
     readonly_fields = ['action_time', 'user', 'action_flag', 'content_type', 'get_url_to_obj', 'get_change_message']
     search_fields = ['object_repr', 'change_message']
 
