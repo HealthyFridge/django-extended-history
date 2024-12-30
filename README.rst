@@ -68,13 +68,13 @@ Apply the **DjangoExtendedHistory** mixin to all applicable admin-views:
     class MyModelAdmin(DjangoExtendedHistory, admin.ModelAdmin):
         ...
 
-------------
+-----------------
 Example Log Entry
-------------
+-----------------
 
 Below an example Log Entry where the first name of a user was changed from 'John' to 'Jane', the email address was changed accordingly and the user was added to a group 'Expert' at the same time.
 
-![Screenshot](https://github.com/HealthyFridge/django-extended-history/blob/main/Screenshot%20change%20message.png?raw=true)
+.. image:: https://github.com/HealthyFridge/django-extended-history/blob/main/Screenshot%20change%20message.png?raw=true
 
 ------------
 Misc
