@@ -21,7 +21,7 @@ Requirements
 Features
 =============
 
--  Drop-in extension for Django history. No changes in any model, hence no migrations.
+-  Drop-in extension for Django history (Log entries). No changes in any model, hence no migrations.
 -  Records all changes in JSON format, extending what Django stores by default.
 -  Adds a view 'Log entries' under 'Administration', showing all content types for which a user has permissions.
 -  Safe to remove. Django will ignore all extra recorded information and revert to it's default history. So give it a spin!
@@ -67,6 +67,14 @@ Apply the **DjangoExtendedHistory** mixin to all applicable admin-views:
     @admin.register(MyModel)
     class MyModelAdmin(DjangoExtendedHistory, admin.ModelAdmin):
         ...
+
+------------
+Example Log Entry
+------------
+
+Below an example Log Entry where the first name of a user was changed from 'John' to 'Jane', the email address was changed accordingly and the user was added to a group 'Expert' at the same time.
+
+![Screenshot](https://github.com/HealthyFridge/django-extended-history/blob/main/Screenshot%20change%20message.png?raw=true)
 
 ------------
 Misc
