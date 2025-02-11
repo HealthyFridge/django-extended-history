@@ -79,7 +79,7 @@ class DjangoExtendedHistory:
                 old_values = {}
                 new_values = {}
                 old_pks = []
-                if form.initial and field in form.initial:
+                if not add and form.initial and field in form.initial:
                     if form.initial[field] is not None and hasattr(form.fields[field], 'queryset'):
                         if isinstance(form.initial[field], list):
                             # is manytomany
@@ -89,10 +89,8 @@ class DjangoExtendedHistory:
                             old_values["object"] = str(form.fields[field].queryset.filter(pk=old_values["pk"]).first())
                     else:
                         old_values["value"] = str(form.initial[field])
-                else:
-                    old_values["value"] = None
 
-                if field in form.cleaned_data:  # For instance password field is NOT in cleaned data: password1 and password2 are. Try change password form
+                if field in form.cleaned_data:
                     if isinstance(form.cleaned_data[field], models.query.QuerySet):
                         # is manytomany
                         new_pks = [item.pk for item in form.cleaned_data[field].all()]
@@ -110,8 +108,14 @@ class DjangoExtendedHistory:
                             new_values["pk"] = safe_pk(form.cleaned_data[field].pk)
                             new_values["object"] = str(form.cleaned_data[field])
                         else:
-                            new_values["value"] = str(form.cleaned_data[field])
-                        field_values = {"old": old_values, "new": new_values}
+                            if form.fields[field].widget.input_type == "password":
+                                new_values["value"] = "*****"
+                            else:
+                                new_values["value"] = str(form.cleaned_data[field])
+                        field_values = {"new": new_values}
+                    
+                    if not add:
+                        field_values.update({"old": old_values})
 
                 change_details.append({field: field_values})
 
