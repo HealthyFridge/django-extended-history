@@ -1,11 +1,13 @@
 import base64
 import json
+import logging
 from typing import Any
 
-from django.contrib import admin
-from django.contrib.admin.models import LogEntry
+from django.contrib import admin, messages
+from django.contrib.admin.models import DELETION, LogEntry
 from django.contrib.admin.utils import construct_change_message
 from django.contrib.auth.models import Permission
+from django.core import serializers
 from django.db import models
 from django.db.models import Q
 from django.urls import NoReverseMatch, reverse
@@ -13,6 +15,10 @@ from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from json2html import json2html
+
+PASSWORD_MASK = "*****"
+
+logger = logging.getLogger(__name__)
 
 
 def safe_pk(pk: Any):
@@ -31,11 +37,9 @@ class DjangoExtendedHistory:
 
         The default implementation creates an admin LogEntry object.
         """
-        from django.contrib.admin.models import DELETION, LogEntry
         from django.contrib.admin.options import get_content_type_for_model
-        from django.core import serializers
 
-        data = serializers.serialize("json", [ obj, ], use_natural_foreign_keys=True)
+        data = serializers.serialize("json", [obj], use_natural_foreign_keys=True)
 
         return LogEntry.objects.log_action(
             user_id=request.user.pk,
@@ -53,15 +57,13 @@ class DjangoExtendedHistory:
 
         The default implementation creates an admin LogEntry object.
         """
-        from django.contrib.admin.models import DELETION, LogEntry
-        from django.core import serializers
 
         return [
             LogEntry.objects.log_actions(
                 user_id=request.user.pk,
                 queryset=[obj],
                 action_flag=DELETION,
-                change_message=serializers.serialize("json", [ obj, ], use_natural_foreign_keys=True),
+                change_message=serializers.serialize("json", [obj], use_natural_foreign_keys=True),
                 single_object=True,
             ) 
             for obj in queryset
@@ -69,123 +71,129 @@ class DjangoExtendedHistory:
 
     def construct_change_message(self, request, form, formsets, add=False):
         # First create the default LogEntry message
-        change_message: list[object] = construct_change_message(form, formsets, add)  # type: ignore - returns List[Dict[str, Dict[str, List[str]]]]
+        change_message = construct_change_message(form, formsets, add)
         # Now add extra audit details
         change_details = []
 
-        if form.changed_data:
-            for field in form.changed_data:
-                field_values = {}
-                old_values = {}
-                new_values = {}
-                old_pks = []
-                if not add and form.initial and field in form.initial:
-                    if form.initial[field] is not None and hasattr(form.fields[field], 'queryset'):
-                        if isinstance(form.initial[field], list):
-                            # is manytomany
-                            old_pks = [item.pk for item in form.initial[field]]
-                        else:
-                            old_values["pk"] = safe_pk(form.initial[field])
-                            old_values["object"] = str(form.fields[field].queryset.filter(pk=old_values["pk"]).first())
-                    else:
-                        old_values["value"] = str(form.initial[field])
-
-                if field in form.cleaned_data:
-                    if isinstance(form.cleaned_data[field], models.query.QuerySet):
-                        # is manytomany
-                        new_pks = [item.pk for item in form.cleaned_data[field].all()]
-                        removed_pks = [item for item in old_pks if item not in new_pks]
-                        removed = [({"pk": safe_pk(item.pk), "object": str(item)}) for item in form.fields[field].queryset.query.model.objects.filter(pk__in=removed_pks)]
-                        if removed:
-                            field_values["removed"] = removed
-
-                        added_pks = [item for item in new_pks if item not in old_pks]
-                        added = [({"pk": safe_pk(item.pk), "object": str(item)}) for item in form.cleaned_data[field] if item.pk in added_pks]
-                        if added:
-                            field_values["added"] = added
-                    else:
-                        if hasattr(form.cleaned_data[field], 'pk'):
-                            new_values["pk"] = safe_pk(form.cleaned_data[field].pk)
-                            new_values["object"] = str(form.cleaned_data[field])
-                        else:
-                            if hasattr(form.fields[field].widget, 'input_type') and form.fields[field].widget.input_type == "password":
-                                new_values["value"] = "*****"
+        try:
+            if form.changed_data:
+                for field in form.changed_data:
+                    field_values = {}
+                    old_values = {}
+                    new_values = {}
+                    old_pks = []
+                    if not add and form.initial and field in form.initial:
+                        if form.initial[field] is not None and hasattr(form.fields[field], 'queryset'):
+                            if isinstance(form.initial[field], list):
+                                # is manytomany
+                                old_pks = [item.pk for item in form.initial[field]]
                             else:
-                                new_values["value"] = str(form.cleaned_data[field])
-                        field_values = {"new": new_values}
-                    
-                    if not add:
-                        field_values.update({"old": old_values})
+                                old_values["pk"] = safe_pk(form.initial[field])
+                                old_values["object"] = str(form.fields[field].queryset.filter(pk=old_values["pk"]).first())
+                        else:
+                            old_values["value"] = str(form.initial[field])
 
-                change_details.append({field: field_values})
+                    if field in form.cleaned_data:
+                        if isinstance(form.cleaned_data[field], models.query.QuerySet):
+                            # is manytomany
+                            new_pks = [item.pk for item in form.cleaned_data[field].all()]
+                            removed_pks = [item for item in old_pks if item not in new_pks]
+                            removed = [({"pk": safe_pk(item.pk), "object": str(item)}) for item in form.fields[field].queryset.query.model.objects.filter(pk__in=removed_pks)]
+                            if removed:
+                                field_values["removed"] = removed
 
-            change_message.append({"details": change_details})
-
-        if formsets:
-            for formset in formsets:
-                added_form_list = []
-                if formset.new_objects:
-                    for added_object in formset.new_objects:
-                        added_fields_list = []
-                        for field in formset.form.base_fields:
-                            new_value = str(added_object.__getattribute__(field))
-                            added_fields_list.append({field: {"new": new_value}})
-                        added_form_list.append({str(added_object._meta.model_name): str(added_object), "fields": added_fields_list})
-                    change_message.append({"added related": added_form_list})
-
-                changed_form_set = []
-                if formset.changed_objects:
-                    for changed_object, changed_fields in formset.changed_objects:
-                        change_form_list = []
-                        for form in formset.initial_forms:
-
-                            changed_fields_list = []
-                            if form.instance != changed_object:
-                                continue
-
-                            for field in changed_fields:
-                                if form.initial[field] is not None and hasattr(form.fields[field], 'queryset'):
-                                    old_value = str(form.fields[field].queryset.filter(pk=form.initial[field]).first())
+                            added_pks = [item for item in new_pks if item not in old_pks]
+                            added = [({"pk": safe_pk(item.pk), "object": str(item)}) for item in form.cleaned_data[field] if item.pk in added_pks]
+                            if added:
+                                field_values["added"] = added
+                        else:
+                            if hasattr(form.cleaned_data[field], 'pk'):
+                                new_values["pk"] = safe_pk(form.cleaned_data[field].pk)
+                                new_values["object"] = str(form.cleaned_data[field])
+                            else:
+                                if hasattr(form.fields[field].widget, 'input_type') and form.fields[field].widget.input_type == "password":
+                                    new_values["value"] = PASSWORD_MASK
                                 else:
-                                    old_value = str(form.initial[field])
-                                new_value = str(form.cleaned_data[field])
+                                    new_values["value"] = str(form.cleaned_data[field])
+                            field_values = {"new": new_values}
+                        
+                        if not add:
+                            field_values.update({"old": old_values})
 
-                                changed_field_content = {"old": old_value,
-                                                         "new": new_value
-                                                         }
-                                changed_fields_list.append({field: changed_field_content})
+                    change_details.append({field: field_values})
 
-                            change_form_list.append({str(changed_object._meta.model_name): str(changed_object), "fields": changed_fields_list})
+                change_message.append({"details": change_details})
+            
+            if formsets:
+                for formset in formsets:
+                    added_form_list = []
+                    if formset.new_objects:
+                        for added_object in formset.new_objects:
+                            added_fields_list = []
+                            for field in formset.form.base_fields:
+                                new_value = str(added_object.__getattribute__(field))
+                                added_fields_list.append({field: {"new": new_value}})
+                            added_form_list.append({str(added_object._meta.model_name): str(added_object), "fields": added_fields_list})
+                        change_message.append({"added related": added_form_list})
 
-                        changed_form_set.append(change_form_list)
+                    changed_form_set = []
+                    if formset.changed_objects:
+                        for changed_object, changed_fields in formset.changed_objects:
+                            change_form_list = []
+                            for form in formset.initial_forms:
 
-                    change_message.append({"changed related": changed_form_set})
+                                changed_fields_list = []
+                                if form.instance != changed_object:
+                                    continue
 
-                deleted_form_set = []
-                if formset.deleted_objects:
-                    for deleted_object in formset.deleted_objects:
-                        deleted_form_list = []
-                        for form in formset.initial_forms:
-
-                            deleted_fields_list = []
-                            if form.instance != deleted_object:
-                                continue
-
-                            for field in form.instance._meta.fields:
-                                if not isinstance(field, (models.AutoField, models.BigAutoField, models.SmallAutoField)):
-                                    if isinstance(field, models.BinaryField):
-                                        old_value = base64.b64encode(getattr(deleted_object, field.name)).decode('utf-8')
+                                for field in changed_fields:
+                                    if form.initial[field] is not None and hasattr(form.fields[field], 'queryset'):
+                                        old_value = str(form.fields[field].queryset.filter(pk=form.initial[field]).first())
                                     else:
-                                        old_value = str(getattr(deleted_object, field.name))
+                                        old_value = str(form.initial[field])
+                                    new_value = str(form.cleaned_data[field])
 
-                                    deleted_field_content = {"old": old_value}
-                                    deleted_fields_list.append({field.name: deleted_field_content})
+                                    changed_field_content = {"old": old_value,
+                                                            "new": new_value
+                                                            }
+                                    changed_fields_list.append({field: changed_field_content})
 
-                            deleted_form_list.append({str(deleted_object._meta.model_name): str(deleted_object), "fields": deleted_fields_list})
+                                change_form_list.append({str(changed_object._meta.model_name): str(changed_object), "fields": changed_fields_list})
 
-                        deleted_form_set.append(deleted_form_list)
+                            changed_form_set.append(change_form_list)
 
-                    change_message.append({"deleted related": deleted_form_set})
+                        change_message.append({"changed related": changed_form_set})
+
+                    deleted_form_set = []
+                    if formset.deleted_objects:
+                        for deleted_object in formset.deleted_objects:
+                            deleted_form_list = []
+                            for form in formset.initial_forms:
+
+                                deleted_fields_list = []
+                                if form.instance != deleted_object:
+                                    continue
+
+                                for field in form.instance._meta.fields:
+                                    if not isinstance(field, (models.AutoField, models.BigAutoField, models.SmallAutoField)):
+                                        if isinstance(field, models.BinaryField):
+                                            old_value = base64.b64encode(getattr(deleted_object, field.name)).decode('utf-8')
+                                        else:
+                                            old_value = str(getattr(deleted_object, field.name))
+
+                                        deleted_field_content = {"old": old_value}
+                                        deleted_fields_list.append({field.name: deleted_field_content})
+
+                                deleted_form_list.append({str(deleted_object._meta.model_name): str(deleted_object), "fields": deleted_fields_list})
+
+                            deleted_form_set.append(deleted_form_list)
+
+                        change_message.append({"deleted related": deleted_form_set})
+                        
+        except Exception:
+            # Log exception and continue
+            logger.exception("Error creating extended change message. Please create an issue https://github.com/HealthyFridge/django-extended-history/issues/new")
+            messages.warning(request, "Extended logging failed. Created a standard log entry instead. See system logs for error details.")
 
         return change_message
 
@@ -203,6 +211,7 @@ class LogEntryAdmin(admin.ModelAdmin):
         queryset = super(LogEntryAdmin, self).get_queryset(request)
         if not request.user.is_superuser:
             # List only those logentries to which to user has permission
+            # Please note: does not check for object-level permissions
             queryset = queryset.filter(Q(content_type__in=Permission.objects.filter(group__user=request.user).values('content_type')) |
                                        Q(content_type__in=Permission.objects.filter(user=request.user).values('content_type')))
         return queryset.prefetch_related('content_type').defer('change_message')
