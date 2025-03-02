@@ -209,12 +209,19 @@ class LogEntryAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         queryset = super(LogEntryAdmin, self).get_queryset(request)
+        queryset = queryset.select_related('content_type', 'user')  # Optimize related lookups
+        
         if not request.user.is_superuser:
-            # List only those logentries to which to user has permission
+            # Get all permitted content types in a single query
+            permitted_content_types = Permission.objects.filter(
+                Q(group__user=request.user) | Q(user=request.user)
+            ).values_list('content_type', flat=True).distinct()
+            
+            # Filter with the prefetched content types
             # Please note: does not check for object-level permissions
-            queryset = queryset.filter(Q(content_type__in=Permission.objects.filter(group__user=request.user).values('content_type')) |
-                                       Q(content_type__in=Permission.objects.filter(user=request.user).values('content_type')))
-        return queryset.prefetch_related('content_type').defer('change_message')
+            queryset = queryset.filter(content_type__in=permitted_content_types)
+            
+        return queryset.defer('change_message')
 
     @admin.display(description=_('change message'))
     def get_change_message(self, request):
