@@ -1,3 +1,61 @@
 [build-system]
-requires = ['setuptools>=42']
+requires = ['setuptools>=68']
 build-backend = 'setuptools.build_meta'
+
+[project]
+name = "django-extended-history"
+version = "1.9.5"
+description = "Drop-in replacement for default Django history"
+readme = "README.rst"
+license = "BSD-3-Clause"
+requires-python = ">=3.8"
+authors = [
+    { name = "Rob Aben", email = "rob@healthyfridge.nl" },
+]
+keywords = ["django", "admin", "history", "audit", "logging"]
+classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Framework :: Django :: 4.2",
+    "Framework :: Django :: 5.0",
+    "Framework :: Django :: 5.1",
+    "Framework :: Django :: 5.2",
+    "Framework :: Django :: 6.0",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Development Status :: 5 - Production/Stable",
+]
+dependencies = [
+    "django>=4.2",
+    "json2html>=1.3.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/HealthyFridge/django-extended-history"
+Repository = "https://github.com/HealthyFridge/django-extended-history"
+"Bug Tracker" = "https://github.com/HealthyFridge/django-extended-history/issues"
+
+[tool.setuptools]
+packages = ["django_extended_history"]
+include-package-data = true
+
+[tool.autopep8]
+max_line_length = 160
+ignore = ["E123"]
+
+[tool.ruff]
+line-length = 160
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "PL"]
+# Ignore formatting/whitespace rules handled by autopep8
+ignore = ["E1", "E2", "E3", "W1", "W2", "W3", "PLR2004", "PLC0415", "PLR0915"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403", "I001"]

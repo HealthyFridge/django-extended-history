@@ -69,7 +69,7 @@ class DjangoExtendedHistory:
             for obj in queryset
         ]
 
-    def construct_change_message(self, request, form, formsets, add=False):
+    def construct_change_message(self, request, form, formsets, add=False):  # noqa: PLR0912
         # First create the default LogEntry message
         change_message = construct_change_message(form, formsets, add)
         # Now add extra audit details
@@ -98,7 +98,8 @@ class DjangoExtendedHistory:
                             # is manytomany
                             new_pks = [item.pk for item in form.cleaned_data[field].all()]
                             removed_pks = [item for item in old_pks if item not in new_pks]
-                            removed = [({"pk": safe_pk(item.pk), "object": str(item)}) for item in form.fields[field].queryset.query.model.objects.filter(pk__in=removed_pks)]
+                            removed_objects = form.fields[field].queryset.query.model.objects.filter(pk__in=removed_pks)
+                            removed = [{"pk": safe_pk(item.pk), "object": str(item)} for item in removed_objects]
                             if removed:
                                 field_values["removed"] = removed
 
@@ -110,11 +111,10 @@ class DjangoExtendedHistory:
                             if hasattr(form.cleaned_data[field], 'pk'):
                                 new_values["pk"] = safe_pk(form.cleaned_data[field].pk)
                                 new_values["object"] = str(form.cleaned_data[field])
+                            elif hasattr(form.fields[field].widget, 'input_type') and form.fields[field].widget.input_type == "password":
+                                new_values["value"] = PASSWORD_MASK
                             else:
-                                if hasattr(form.fields[field].widget, 'input_type') and form.fields[field].widget.input_type == "password":
-                                    new_values["value"] = PASSWORD_MASK
-                                else:
-                                    new_values["value"] = str(form.cleaned_data[field])
+                                new_values["value"] = str(form.cleaned_data[field])
                             field_values = {"new": new_values}
                         
                         if not add:
@@ -131,7 +131,7 @@ class DjangoExtendedHistory:
                         for added_object in formset.new_objects:
                             added_fields_list = []
                             for field in formset.form.base_fields:
-                                new_value = str(added_object.__getattribute__(field))
+                                new_value = str(getattr(added_object, field, ""))
                                 added_fields_list.append({field: {"new": new_value}})
                             added_form_list.append({str(added_object._meta.model_name): str(added_object), "fields": added_fields_list})
                         change_message.append({"added related": added_form_list})
@@ -140,18 +140,18 @@ class DjangoExtendedHistory:
                     if formset.changed_objects:
                         for changed_object, changed_fields in formset.changed_objects:
                             change_form_list = []
-                            for form in formset.initial_forms:
+                            for initial_form in formset.initial_forms:
 
                                 changed_fields_list = []
-                                if form.instance != changed_object:
+                                if initial_form.instance != changed_object:
                                     continue
 
                                 for field in changed_fields:
-                                    if form.initial[field] is not None and hasattr(form.fields[field], 'queryset'):
-                                        old_value = str(form.fields[field].queryset.filter(pk=form.initial[field]).first())
+                                    if initial_form.initial[field] is not None and hasattr(initial_form.fields[field], 'queryset'):
+                                        old_value = str(initial_form.fields[field].queryset.filter(pk=initial_form.initial[field]).first())
                                     else:
-                                        old_value = str(form.initial[field])
-                                    new_value = str(form.cleaned_data[field])
+                                        old_value = str(initial_form.initial[field])
+                                    new_value = str(initial_form.cleaned_data[field])
 
                                     changed_field_content = {"old": old_value,
                                                             "new": new_value
@@ -168,13 +168,13 @@ class DjangoExtendedHistory:
                     if formset.deleted_objects:
                         for deleted_object in formset.deleted_objects:
                             deleted_form_list = []
-                            for form in formset.initial_forms:
+                            for initial_form in formset.initial_forms:
 
                                 deleted_fields_list = []
-                                if form.instance != deleted_object:
+                                if initial_form.instance != deleted_object:
                                     continue
 
-                                for field in form.instance._meta.fields:
+                                for field in initial_form.instance._meta.fields:
                                     if not isinstance(field, (models.AutoField, models.BigAutoField, models.SmallAutoField)):
                                         if isinstance(field, models.BinaryField):
                                             old_value = base64.b64encode(getattr(deleted_object, field.name)).decode('utf-8')
@@ -208,7 +208,7 @@ class LogEntryAdmin(admin.ModelAdmin):
     search_fields = ['object_repr', 'change_message']
 
     def get_queryset(self, request):
-        queryset = super(LogEntryAdmin, self).get_queryset(request)
+        queryset = super().get_queryset(request)
         queryset = queryset.select_related('content_type', 'user')  # Optimize related lookups
         
         if not request.user.is_superuser:
