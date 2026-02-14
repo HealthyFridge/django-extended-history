@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = "django-extended-history"
-version = "1.9.5"
+version = "1.9.6"
 description = "Drop-in replacement for default Django history"
 readme = "README.rst"
 license = "BSD-3-Clause"
