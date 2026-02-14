@@ -27,8 +27,7 @@ classifiers = [
     "Framework :: Django :: 5.1",
     "Framework :: Django :: 5.2",
     "Framework :: Django :: 6.0",
-    "License :: OSI Approved :: BSD License",
-    "Operating System :: OS Independent",
+"Operating System :: OS Independent",
     "Development Status :: 5 - Production/Stable",
 ]
 dependencies = [
