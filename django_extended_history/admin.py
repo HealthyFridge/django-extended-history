@@ -109,6 +109,8 @@ class DjangoExtendedHistory:
                             else:
                                 old_values["pk"] = safe_pk(form.initial[field])
                                 old_values["object"] = _resolve_old_value(form.fields[field], form.initial[field])
+                        elif hasattr(form.fields[field].widget, 'input_type') and form.fields[field].widget.input_type == "password":
+                            old_values["value"] = PASSWORD_MASK
                         else:
                             old_values["value"] = str(form.initial[field])
 

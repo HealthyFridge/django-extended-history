@@ -243,6 +243,7 @@ class TestDjangoExtendedHistory(TestCase):
         details_items = [item for item in result if "details" in item]
         self.assertEqual(len(details_items), 1)
         field_entry = details_items[0]["details"][0]["password"]
+        self.assertEqual(field_entry["old"]["value"], "*****")
         self.assertEqual(field_entry["new"]["value"], "*****")
 
     # --- construct_change_message: add=True omits old values ---
