@@ -26,6 +26,25 @@ def safe_pk(pk: Any):
     return pk if isinstance(pk, (int, str, bytes, bytearray)) else str(pk)
 
 
+def _resolve_old_value(field_obj, initial_value):
+    """Return a display representation of a field's initial value.
+
+    - M2M (initial is a list of instances): returns {"removed": [...], "added": []} placeholder
+      so callers can diff against new values.
+    - FK (field has a queryset, initial is a scalar PK): returns {"pk": ..., "object": str}
+    - Plain field: returns str(initial_value)
+    """
+    if initial_value is None:
+        return str(initial_value)
+    if hasattr(field_obj, 'queryset'):
+        if isinstance(initial_value, list):
+            # M2M: initial is a list of model instances
+            return [{"pk": safe_pk(item.pk), "object": str(item)} for item in initial_value]
+        # FK: initial is a scalar PK
+        return str(field_obj.queryset.filter(pk=initial_value).first())
+    return str(initial_value)
+
+
 class DjangoExtendedHistory:
     object_history_template = 'object_history.html'
 
@@ -49,7 +68,7 @@ class DjangoExtendedHistory:
             action_flag=DELETION,
             change_message=data,
         )
-        
+
     def log_deletions(self, request, queryset):
         """
         Log that an object will be deleted. Note that this method must be
@@ -65,7 +84,7 @@ class DjangoExtendedHistory:
                 action_flag=DELETION,
                 change_message=serializers.serialize("json", [obj], use_natural_foreign_keys=True),
                 single_object=True,
-            ) 
+            )
             for obj in queryset
         ]
 
@@ -89,7 +108,7 @@ class DjangoExtendedHistory:
                                 old_pks = [item.pk for item in form.initial[field]]
                             else:
                                 old_values["pk"] = safe_pk(form.initial[field])
-                                old_values["object"] = str(form.fields[field].queryset.filter(pk=old_values["pk"]).first())
+                                old_values["object"] = _resolve_old_value(form.fields[field], form.initial[field])
                         else:
                             old_values["value"] = str(form.initial[field])
 
@@ -116,14 +135,14 @@ class DjangoExtendedHistory:
                             else:
                                 new_values["value"] = str(form.cleaned_data[field])
                             field_values = {"new": new_values}
-                        
+
                         if not add:
                             field_values.update({"old": old_values})
 
                     change_details.append({field: field_values})
 
                 change_message.append({"details": change_details})
-            
+
             if formsets:
                 for formset in formsets:
                     added_form_list = []
@@ -147,15 +166,21 @@ class DjangoExtendedHistory:
                                     continue
 
                                 for field in changed_fields:
-                                    if initial_form.initial[field] is not None and hasattr(initial_form.fields[field], 'queryset'):
-                                        old_value = str(initial_form.fields[field].queryset.filter(pk=initial_form.initial[field]).first())
+                                    old_resolved = _resolve_old_value(initial_form.fields[field], initial_form.initial[field])
+                                    if isinstance(old_resolved, list):
+                                        # M2M: diff old instances against new instances
+                                        old_pks = [item["pk"] for item in old_resolved]
+                                        new_instances = list(initial_form.cleaned_data[field])
+                                        new_pks = [safe_pk(item.pk) for item in new_instances]
+                                        removed = [e for e in old_resolved if e["pk"] not in new_pks]
+                                        added = [{"pk": safe_pk(item.pk), "object": str(item)} for item in new_instances if safe_pk(item.pk) not in old_pks]
+                                        changed_field_content = {}
+                                        if removed:
+                                            changed_field_content["removed"] = removed
+                                        if added:
+                                            changed_field_content["added"] = added
                                     else:
-                                        old_value = str(initial_form.initial[field])
-                                    new_value = str(initial_form.cleaned_data[field])
-
-                                    changed_field_content = {"old": old_value,
-                                                            "new": new_value
-                                                            }
+                                        changed_field_content = {"old": old_resolved, "new": str(initial_form.cleaned_data[field])}
                                     changed_fields_list.append({field: changed_field_content})
 
                                 change_form_list.append({str(changed_object._meta.model_name): str(changed_object), "fields": changed_fields_list})
@@ -189,7 +214,7 @@ class DjangoExtendedHistory:
                             deleted_form_set.append(deleted_form_list)
 
                         change_message.append({"deleted related": deleted_form_set})
-                        
+
         except Exception:
             # Log exception and continue
             logger.exception("Error creating extended change message. Please create an issue https://github.com/HealthyFridge/django-extended-history/issues/new")
@@ -224,8 +249,8 @@ class LogEntryAdmin(admin.ModelAdmin):
         return queryset.defer('change_message')
 
     @admin.display(description=_('change message'))
-    def get_change_message(self, request):
-        cm: str = request.change_message
+    def get_change_message(self, obj):
+        cm: str = obj.change_message
         if cm and cm[0] == "[":
             try:
                 cm = mark_safe(json2html.convert(json=cm))  # type: ignore
@@ -234,14 +259,14 @@ class LogEntryAdmin(admin.ModelAdmin):
         return cm
 
     @admin.display(description=_('object repr'))
-    def get_url_to_obj(self, request):
-        if request.content_type and request.object_id:
+    def get_url_to_obj(self, obj):
+        if obj.content_type and obj.object_id:
             try:
-                change_url = reverse(f'admin:{request.content_type.app_label}_{request.content_type.model}_change', args=(request.object_id,))
-                return format_html('<a href="{}">{}</a>', change_url, request.object_repr)
+                change_url = reverse(f'admin:{obj.content_type.app_label}_{obj.content_type.model}_change', args=(obj.object_id,))
+                return format_html('<a href="{}">{}</a>', change_url, obj.object_repr)
             except NoReverseMatch:
                 pass
-        return request.object_repr
+        return obj.object_repr
 
     def has_delete_permission(self, request, obj=None):
         return False

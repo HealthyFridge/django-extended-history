@@ -44,6 +44,10 @@ Repository = "https://github.com/HealthyFridge/django-extended-history"
 packages = ["django_extended_history"]
 include-package-data = true
 
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "django_extended_history._test_settings"
+python_files = ["tests.py"]
+
 [tool.autopep8]
 max_line_length = 160
 ignore = ["E123"]
@@ -58,3 +62,4 @@ ignore = ["E1", "E2", "E3", "W1", "W2", "W3", "PLR2004", "PLC0415", "PLR0915"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403", "I001"]
+"django_extended_history/tests.py" = ["E402", "I001"]
