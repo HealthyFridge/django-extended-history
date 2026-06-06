@@ -77,6 +77,20 @@ Below an example Log Entry where the first name of a user was changed from 'John
 .. image:: https://github.com/HealthyFridge/django-extended-history/blob/main/Screenshot%20change%20message.png?raw=true
 
 ------------
+Settings
+------------
+
+**DJANGO_EXTENDED_HISTORY_LANGUAGE**
+
+By default, log entries are written in the language active during the request. Set this to a language code to write all log entries in a fixed language regardless of the user's locale:
+
+.. code-block:: python
+
+    DJANGO_EXTENDED_HISTORY_LANGUAGE = 'en'
+
+This is useful when you want consistent, searchable log entries across a multilingual site.
+
+------------
 Misc
 ------------
 

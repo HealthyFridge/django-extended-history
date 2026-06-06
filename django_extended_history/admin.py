@@ -1,8 +1,10 @@
 import base64
 import json
 import logging
+from contextlib import nullcontext
 from typing import Any
 
+from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.admin.models import DELETION, LogEntry
 from django.contrib.admin.utils import construct_change_message
@@ -14,9 +16,16 @@ from django.urls import NoReverseMatch, reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import override as translation_override
 from json2html import json2html
 
 PASSWORD_MASK = "*****"
+HISTORY_LANGUAGE = getattr(settings, 'DJANGO_EXTENDED_HISTORY_LANGUAGE', None)
+
+
+def _translation_override():
+    return translation_override(HISTORY_LANGUAGE) if HISTORY_LANGUAGE is not None else nullcontext()
+
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +57,14 @@ def _resolve_old_value(field_obj, initial_value):
 class DjangoExtendedHistory:
     object_history_template = 'object_history.html'
 
+    def log_addition(self, request, obj, message):
+        with _translation_override():
+            return super().log_addition(request, obj, message)
+
+    def log_change(self, request, obj, message):
+        with _translation_override():
+            return super().log_change(request, obj, message)
+
     # Deprecated in Django 5.1. Keep until end-of-support for Django 4.2 LTS (April 2026)
     def log_deletion(self, request, obj, object_repr):
         """
@@ -60,35 +77,50 @@ class DjangoExtendedHistory:
 
         data = serializers.serialize("json", [obj], use_natural_foreign_keys=True)
 
-        return LogEntry.objects.log_action(
-            user_id=request.user.pk,
-            content_type_id=get_content_type_for_model(obj).pk,
-            object_id=obj.pk,
-            object_repr=object_repr,
-            action_flag=DELETION,
-            change_message=data,
-        )
+        with _translation_override():
+            return LogEntry.objects.log_action(
+                user_id=request.user.pk,
+                content_type_id=get_content_type_for_model(obj).pk,
+                object_id=obj.pk,
+                object_repr=object_repr,
+                action_flag=DELETION,
+                change_message=data,
+            )
 
     def log_deletions(self, request, queryset):
         """
-        Log that an object will be deleted. Note that this method must be
+        Log that objects will be deleted. Note that this method must be
         called before the deletion.
 
-        The default implementation creates an admin LogEntry object.
+        The default implementation creates admin LogEntry objects.
         """
-
-        return [
-            LogEntry.objects.log_actions(
-                user_id=request.user.pk,
-                queryset=[obj],
-                action_flag=DELETION,
-                change_message=serializers.serialize("json", [obj], use_natural_foreign_keys=True),
-                single_object=True,
-            )
-            for obj in queryset
-        ]
+        with _translation_override():
+            return [
+                LogEntry.objects.log_actions(
+                    user_id=request.user.pk,
+                    queryset=[obj],
+                    action_flag=DELETION,
+                    change_message=serializers.serialize("json", [obj], use_natural_foreign_keys=True),
+                    single_object=True,
+                )
+                for obj in queryset
+            ]
 
     def construct_change_message(self, request, form, formsets, add=False):  # noqa: PLR0912
+        # Force changed_data to be cached with the request locale before switching.
+        # DecimalField.to_python() is locale-sensitive; evaluating inside the override
+        # causes it to fail on NL-formatted input (e.g. '45,00'), which makes
+        # has_changed() return True via the ValidationError branch — a false positive.
+        form.changed_data  # noqa: B018
+        if formsets:
+            for formset in formsets:
+                formset.changed_objects  # noqa: B018
+                formset.new_objects  # noqa: B018
+                formset.deleted_objects  # noqa: B018
+        with _translation_override():
+            return self._do_construct_change_message(request, form, formsets, add)
+
+    def _do_construct_change_message(self, request, form, formsets, add=False):  # noqa: PLR0912
         # First create the default LogEntry message
         change_message = construct_change_message(form, formsets, add)
         # Now add extra audit details
