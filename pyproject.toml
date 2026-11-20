@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = "django-extended-history"
-version = "1.10.0"
+version = "1.10.1"
 description = "Drop-in replacement for default Django history"
 readme = "README.rst"
 license = "BSD-3-Clause"
@@ -22,11 +22,13 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Framework :: Django :: 4.2",
     "Framework :: Django :: 5.0",
     "Framework :: Django :: 5.1",
     "Framework :: Django :: 5.2",
     "Framework :: Django :: 6.0",
+    "Framework :: Django :: 6.1",
     "Operating System :: OS Independent",
     "Development Status :: 5 - Production/Stable",
 ]
@@ -51,6 +53,12 @@ python_files = ["tests.py"]
 [tool.autopep8]
 max_line_length = 160
 ignore = ["E123"]
+
+[tool.mypy]
+
+[[tool.mypy.overrides]]
+module = ["django.*", "json2html.*"]
+ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 160

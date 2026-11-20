@@ -1,6 +1,6 @@
 import base64
 import json
-from unittest import mock
+from unittest import mock, skipIf
 
 import django
 from django.conf import settings as _django_settings
@@ -47,6 +47,12 @@ from django.test import TestCase, RequestFactory
 from django.urls import reverse, NoReverseMatch
 
 from django_extended_history.admin import DjangoExtendedHistory, LogEntryAdmin, safe_pk, _resolve_old_value
+
+# The admin calls log_deletion before Django 5.1 and log_deletions from 5.1 on.
+# log_deletion relies on LogEntryManager.log_action, removed in Django 6.0;
+# log_deletions relies on LogEntryManager.log_actions, added in Django 5.1.
+skip_log_deletion = skipIf(django.VERSION >= (6, 0), "log_deletion is not used by the admin since Django 5.1 (log_action removed in 6.0)")
+skip_log_deletions = skipIf(django.VERSION < (5, 1), "log_deletions is only used by the admin from Django 5.1")
 
 
 def make_request_with_messages(factory, user):
@@ -163,6 +169,7 @@ class TestDjangoExtendedHistory(TestCase):
 
     # --- log_deletion ---
 
+    @skip_log_deletion
     def test_log_deletion_creates_log_entry(self):
         log_entry = self.history.log_deletion(self.request, self.test_user, str(self.test_user))
         self.assertIsNotNone(log_entry)
@@ -170,21 +177,25 @@ class TestDjangoExtendedHistory(TestCase):
         self.assertEqual(log_entry.action_flag, DELETION)
         self.assertEqual(log_entry.object_id, str(self.test_user.pk))
 
+    @skip_log_deletion
     def test_log_deletion_change_message_contains_serialized_object(self):
         log_entry = self.history.log_deletion(self.request, self.test_user, str(self.test_user))
         self.assertTrue(log_entry.change_message.startswith('[{"model":'))
 
+    @skip_log_deletion
     def test_log_deletion_object_repr(self):
         log_entry = self.history.log_deletion(self.request, self.test_user, "My Repr")
         self.assertEqual(log_entry.object_repr, "My Repr")
 
     # --- log_deletions ---
 
+    @skip_log_deletions
     def test_log_deletions_creates_entry_per_object(self):
         second = User.objects.create(username='anotheruser', email='another@example.com')
         results = self.history.log_deletions(self.request, [self.test_user, second])
         self.assertEqual(len(results), 2)
 
+    @skip_log_deletions
     def test_log_deletions_single_object(self):
         results = self.history.log_deletions(self.request, [self.test_user])
         self.assertEqual(len(results), 1)
@@ -851,6 +862,7 @@ class IntegrationTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
+    @skip_log_deletion
     def test_log_deletion_integration(self):
         factory = RequestFactory()
         request = make_request_with_messages(factory, self.superuser)
@@ -865,6 +877,7 @@ class IntegrationTests(TestCase):
         self.assertEqual(log_entry.user_id, self.superuser.id)
         self.assertEqual(LogEntry.objects.filter(action_flag=DELETION).count(), 1)
 
+    @skip_log_deletions
     def test_log_deletions_integration(self):
         factory = RequestFactory()
         request = make_request_with_messages(factory, self.superuser)
